@@ -1,0 +1,43 @@
+[project]
+name = "be-an-fde-for-a-day"
+version = "0.0.0"
+description = "uv workspace root"
+requires-python = ">=3.12"
+
+[dependency-groups]
+dev = [
+    "pyright>=1.1.408",
+    "ruff>=0.15.9",
+]
+
+[tool.pyright]
+venvPath = "."
+venv = ".venv"
+extraPaths = [
+    "common/libs/fastapi/src",
+    "common/libs/models/src",
+]
+
+[tool.pytest.ini_options]
+addopts = "--import-mode=importlib"
+
+[tool.uv]
+required-version = ">=0.9.5"
+
+[tool.uv.workspace]
+members = [
+    # Common libs & apps (synced from fde-libs):
+    # common/
+    #     libs/
+    #     apps/
+    #
+    # Our libs & apps:
+    # libs/
+    #     my-lib/
+    # apps/
+    #     my-app/
+    "common/libs/*",
+    "common/apps/*",
+    "libs/*",
+    "apps/*",
+]

@@ -1,0 +1,66 @@
+# Copyright (c) Microsoft. All rights reserved.
+line-length = 120
+indent-width = 4
+
+[lint]
+select = [
+    # pycodestyle
+    "E",
+    # Pyflakes
+    "F",
+    # pyupgrade
+    "UP",
+    # flake8-bugbear
+    "B",
+    # flake8-simplify
+    "SIM",
+    # isort
+    "I",
+    # flake8-tidy-imports
+    "TID",
+    # Pylint - import rules
+    "PLC0415",
+]
+
+[lint.isort]
+# Forcing every import to be on its own line makes diffs involving import changes easier to read.
+force-single-line = true
+
+section-order = [
+    "future",
+    "standard-library",
+    "third-party",
+    "local-folder",
+    "first-party",
+]
+
+# Libs should be namespaced under "ms":
+# ms.<customer>.<lib>
+# For example:
+# - ms.customer.models
+# - ms.common.caching
+known-local-folder = [
+    "ms",
+]
+
+known-first-party = [
+    "src",
+]
+
+[lint.flake8-tidy-imports]
+# Disallow all relative imports.
+ban-relative-imports = "all"
+
+[lint.flake8-tidy-imports.banned-api]
+# Prevent usage of HTTPException from fastapi in all projects
+"fastapi.HTTPException".msg = "do not import HTTPException from fastapi. Use the exception middleware to manage HTTP errors."
+
+# Prevent from __future__ import annotations
+"__future__.annotations".msg = "do not use 'from __future__ import annotations'"
+
+# Prevent direct usage of pydantic.BaseModel
+"pydantic.BaseModel".msg = "do not use pydantic.BaseModel directly. use FrozenBaseModel instead."
+
+# Prevent sys.path manipulation
+"sys.path.insert".msg = "do not use sys.path.insert. use proper package structure and imports instead."
+"sys.path.append".msg = "do not use sys.path.append. use proper package structure and imports instead."

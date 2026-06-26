@@ -1,0 +1,17 @@
+{
+    "features": {
+        "ghcr.io/devcontainers-extra/features/pulumi:1": {
+            "bashCompletion": true,
+            "version": "latest"
+        },
+        "ghcr.io/devcontainers-extra/features/uv:1": {
+            "version": "latest"
+        }
+    },
+    "postCreateCommand": {
+        "auto-push-remote": "git config push.autoSetupRemote true",
+        "pre-commit-install": "uvx pre-commit install",
+        "py-install": "cd py && uv sync",
+        "ts-install": "cd ts && pnpm install"
+    }
+}

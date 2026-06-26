@@ -1,0 +1,19 @@
+{
+    "name": "be-an-fde-for-a-day",
+    "version": "0.0.0",
+    "description": "pnpm workspace root",
+    "private": true,
+    "scripts": {
+        "test-all": "pnpm --recursive --workspace-concurrency 0 test",
+        "build-all": "pnpm --recursive --workspace-concurrency 0 build",
+        "run-eslint-all": "pnpm --recursive --workspace-concurrency 0 run-eslint",
+        "fix-eslint-all": "pnpm --recursive --workspace-concurrency 0 fix-eslint",
+        "preinstall": "npx only-allow pnpm"
+    },
+    "engines": {
+        "node": ">=22.0.0",
+        "npm": ">=10.0.0",
+        "pnpm": ">=10.16.1"
+    },
+    "packageManager": "pnpm@10.27.0"
+}

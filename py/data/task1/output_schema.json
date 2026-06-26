@@ -1,0 +1,99 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "TriageDecision",
+    "description": "The expected triage output for a single signal.",
+    "type": "object",
+    "required": [
+        "ticket_id",
+        "category",
+        "priority",
+        "assigned_team",
+        "needs_escalation",
+        "missing_information",
+        "next_best_action",
+        "remediation_steps"
+    ],
+    "properties": {
+        "ticket_id": {
+            "type": "string",
+            "description": "Must match the input ticket_id exactly."
+        },
+        "category": {
+            "type": "string",
+            "enum": [
+                "Crew Access & Biometrics",
+                "Hull & Structural Systems",
+                "Communications & Navigation",
+                "Flight Software & Instruments",
+                "Threat Detection & Containment",
+                "Telemetry & Data Banks",
+                "Mission Briefing Request",
+                "Not a Mission Signal"
+            ],
+            "description": "The anomaly category."
+        },
+        "priority": {
+            "type": "string",
+            "enum": [
+                "P1",
+                "P2",
+                "P3",
+                "P4"
+            ],
+            "description": "Priority level. P1 = Red Alert (critical/life-threatening), P2 = Yellow Alert (major, no workaround), P3 = Standard Ops (impact with workaround), P4 = Routine (minor/cosmetic)."
+        },
+        "assigned_team": {
+            "type": "string",
+            "enum": [
+                "Crew Identity & Airlock Control",
+                "Spacecraft Systems Engineering",
+                "Deep Space Communications",
+                "Mission Software Operations",
+                "Threat Response Command",
+                "Telemetry & Data Core",
+                "None"
+            ],
+            "description": "The specialist response division to route to. Use 'None' only when the signal is not a real mission signal."
+        },
+        "needs_escalation": {
+            "type": "boolean",
+            "description": "True if the signal requires escalation beyond normal routing (hostile contacts, VIP/command escalation, repeat failures, compliance)."
+        },
+        "missing_information": {
+            "type": "array",
+            "items": {
+                "type": "string",
+                "enum": [
+                    "affected_subsystem",
+                    "anomaly_readout",
+                    "sequence_to_reproduce",
+                    "affected_crew",
+                    "habitat_conditions",
+                    "stardate",
+                    "previous_signal_id",
+                    "crew_contact",
+                    "module_specs",
+                    "software_version",
+                    "sector_coordinates",
+                    "mission_impact",
+                    "recurrence_pattern",
+                    "sensor_log_or_capture",
+                    "biometric_method",
+                    "system_configuration"
+                ]
+            },
+            "description": "Information missing from the signal that is needed for resolution. Use only values from the enum. Empty array if the signal is complete."
+        },
+        "next_best_action": {
+            "type": "string",
+            "description": "A single sentence describing the most important next step for the assigned response division."
+        },
+        "remediation_steps": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            },
+            "description": "Ordered list of specific, actionable remediation steps an operator should follow."
+        }
+    }
+}

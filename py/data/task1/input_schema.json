@@ -1,0 +1,74 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Signal",
+    "description": "An incoming spacecraft signal received by Contoso Deep Space Station (CDSS).",
+    "type": "object",
+    "required": [
+        "ticket_id",
+        "subject",
+        "description",
+        "reporter",
+        "created_at",
+        "channel"
+    ],
+    "properties": {
+        "ticket_id": {
+            "type": "string",
+            "description": "Unique signal identifier (e.g., SIG-4829).",
+            "pattern": "^SIG-[0-9]+$"
+        },
+        "subject": {
+            "type": "string",
+            "description": "Short summary or subject line of the signal. May be missing, vague, or misleading."
+        },
+        "description": {
+            "type": "string",
+            "description": "Full signal transmission content. Quality varies: may be detailed, terse, garbled, or empty."
+        },
+        "reporter": {
+            "type": "object",
+            "required": [
+                "name",
+                "email",
+                "department"
+            ],
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "description": "Reporter's full name."
+                },
+                "email": {
+                    "type": "string",
+                    "format": "email",
+                    "description": "Reporter's email address at cdss.space."
+                },
+                "department": {
+                    "type": "string",
+                    "description": "Station department or division (e.g., Power Core Engineering, Exobiology Lab, Flight Deck Operations)."
+                }
+            }
+        },
+        "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 timestamp of when the signal was received."
+        },
+        "channel": {
+            "type": "string",
+            "enum": [
+                "subspace_relay",
+                "holodeck_comm",
+                "bridge_terminal",
+                "emergency_beacon"
+            ],
+            "description": "How the signal was submitted."
+        },
+        "attachments": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            },
+            "description": "Filenames of attachments mentioned in the signal. Actual files are not provided — only names."
+        }
+    }
+}

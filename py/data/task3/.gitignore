@@ -1,0 +1,14 @@
+# Cohort-2 secrecy contract for T3 (Workflow Orchestration).
+#
+# We DO ship ``public_eval_50_mock_responses.json`` — it is required for
+# ``make eval-orchestrate`` to function locally and is harmless against
+# the hidden eval, which uses a disjoint set of 500 task IDs that are
+# rotated per submission (see WS1.3 in the platform repo). A candidate
+# who hardcodes from the public mocks earns a perfect score on the
+# 50 public task IDs (which appear on no leaderboard) and 0 % on the
+# hidden 500 (which is what counts).
+#
+# What we do NOT ship is the hidden mock responses. Block any file that
+# could expose them by accident.
+hidden_*_mock_responses.json
+hidden_eval_*.json

@@ -1,0 +1,38 @@
+{
+    "permissions": {
+        "allow": [
+            "Bash(git checkout:*)",
+            "Bash(git pull:*)",
+            "Bash(git add:*)",
+            "Bash(git commit:*)",
+            "Bash(git push:*)",
+            "Bash(git status:*)",
+            "Bash(git branch:*)",
+            "Bash(git fetch:*)",
+            "Bash(git merge:*)",
+            "Bash(gh pr create:*)",
+            "Bash(gh pr view:*)",
+            "Bash(gh pr comment:*)",
+            "Bash(gh pr edit:*)",
+            "Bash(gh api:*)",
+            "Bash(gh auth status:*)",
+            "Bash(gh --version:*)",
+            "Bash(pwsh -File *monitor-pr.ps1*)",
+            "Bash(cd py; uv sync --all-packages:*)",
+            "Bash(npm install -g pnpm@10.27.0:*)",
+            "Bash(cd ts; pnpm install --frozen-lockfile:*)",
+            "Bash(uvx pre-commit run --all-files:*)",
+            "Bash(cd py; uv run pyright apps/sample common/libs/models common/libs/fastapi:*)",
+            "Bash(cd ts; pnpm build-all:*)",
+            "Bash(cd ts; pnpm run-eslint-all:*)",
+            "Bash(cd py\\common\\libs\\models; uv run pytest:*)",
+            "Bash(cd py\\common\\libs\\fastapi; uv run pytest:*)",
+            "Bash(cd ts; pnpm test-all:*)",
+            "Bash(cd py\\apps\\sample; uv run pytest:*)",
+            "Skill(bic-common-*)"
+        ]
+    },
+    "env": {
+        "BASH_MAX_TIMEOUT_MS": "604800000"
+    }
+}

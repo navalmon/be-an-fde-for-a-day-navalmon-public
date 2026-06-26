@@ -1,0 +1,35 @@
+[project]
+name = "ms-common-fdebenchkit"
+version = "0.1.0"
+description = "FDEBench Tier 1 deterministic scoring"
+requires-python = ">=3.12"
+dependencies = [
+    "ms-common-models",
+    "httpx>=0.28.1",
+    "pydantic>=2.11.0",
+]
+
+[tool.uv.sources]
+ms-common-models = { workspace = true }
+
+[dependency-groups]
+dev = [
+    "pyright>=1.1.407",
+    "pytest>=8.4.2",
+    "pytest-asyncio>=1.2.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/ms"]
+
+[tool.pyright]
+pythonVersion = "3.12"
+extraPaths = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+asyncio_mode = "auto"

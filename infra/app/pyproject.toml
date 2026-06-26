@@ -1,0 +1,20 @@
+[project]
+name = "infra"
+version = "0.0.0"
+requires-python=">=3.12"
+dependencies = [
+    "pulumi>=3.214.1",
+    "pulumi-azure-native>=3.19.0",
+    "pulumi-command>=1.2.1",
+]
+
+[dependency-groups]
+dev = [
+    "pyright>=1.1.407",
+]
+
+[tool.pyright]
+typeCheckingMode = "strict"
+
+[tool.uv]
+required-version = ">=0.9.5"

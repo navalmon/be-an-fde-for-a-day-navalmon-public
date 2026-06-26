@@ -1,0 +1,87 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "WorkflowInput",
+    "description": "A workflow orchestration request with a goal, available tools, and constraints.",
+    "type": "object",
+    "required": [
+        "task_id",
+        "goal",
+        "available_tools"
+    ],
+    "properties": {
+        "task_id": {
+            "type": "string",
+            "description": "Unique task identifier (e.g., TASK-001)."
+        },
+        "goal": {
+            "type": "string",
+            "description": "Natural language description of the workflow objective."
+        },
+        "available_tools": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "required": [
+                    "name",
+                    "description",
+                    "endpoint",
+                    "parameters"
+                ],
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "Tool identifier."
+                    },
+                    "description": {
+                        "type": "string",
+                        "description": "What the tool does."
+                    },
+                    "endpoint": {
+                        "type": "string",
+                        "format": "uri",
+                        "description": "HTTP endpoint to call the tool."
+                    },
+                    "parameters": {
+                        "type": "array",
+                        "description": "List of tool parameters, including type and requirement metadata.",
+                        "items": {
+                            "type": "object",
+                            "required": [
+                                "name",
+                                "type"
+                            ],
+                            "properties": {
+                                "name": {
+                                    "type": "string",
+                                    "description": "Parameter name."
+                                },
+                                "type": {
+                                    "type": "string",
+                                    "description": "Parameter data type."
+                                },
+                                "description": {
+                                    "type": "string",
+                                    "description": "Human-readable parameter description."
+                                },
+                                "required": {
+                                    "type": "boolean",
+                                    "description": "Whether the parameter is required."
+                                }
+                            },
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            },
+            "description": "Tools available for the workflow."
+        },
+        "constraints": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            },
+            "description": "Business rules and constraints the workflow must satisfy.",
+            "default": []
+        }
+    }
+}

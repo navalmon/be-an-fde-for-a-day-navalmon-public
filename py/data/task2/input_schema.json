@@ -1,0 +1,35 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "DocumentInput",
+    "description": "A document image to extract structured data from. Each document comes with a json_schema describing the expected output fields.",
+    "type": "object",
+    "required": [
+        "document_id",
+        "content",
+        "content_format"
+    ],
+    "properties": {
+        "document_id": {
+            "type": "string",
+            "description": "Unique document identifier (e.g., DOC-OCR-0366)."
+        },
+        "content": {
+            "type": "string",
+            "description": "Relative path to the document image file (e.g., `images/DOC-OCR-0869.png`), resolved against the directory containing this `public_eval_50.json` file."
+        },
+        "content_format": {
+            "type": "string",
+            "enum": [
+                "image_path"
+            ],
+            "description": "Format of the content field. Always `image_path` for the public eval; the hidden eval may use other formats."
+        },
+        "json_schema": {
+            "type": [
+                "string",
+                "null"
+            ],
+            "description": "JSON schema (as a string) describing the expected output structure. Each document has a different schema."
+        }
+    }
+}

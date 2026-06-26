@@ -1,0 +1,65 @@
+# pre-commit is a framework for managing and maintaining multi-language pre-commit hooks: https://pre-commit.com/
+default_language_version:
+  python: python3.12
+
+exclude: ^\.agents/
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: check-json
+        name: check json
+        exclude: py/data/task2/public_eval_50\.json
+      - id: check-toml
+        name: check toml
+      - id: check-yaml
+        name: check yaml
+      - id: end-of-file-fixer
+        name: end of file fixer
+      - id: trailing-whitespace
+        name: trailing whitespace
+      - id: pretty-format-json
+        name: format json
+        exclude: py/data/task2/public_eval_50\.json
+        args:
+          - --autofix
+          - --indent=4
+          - --no-sort-keys
+          - --no-ensure-ascii
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.14.10
+    hooks:
+      - id: ruff-format
+        name: '[py] format'
+        args:
+          - --config
+          - ruff.toml
+
+      - id: ruff-check
+        name: '[py] lint'
+        args:
+          - --fix
+          - --config
+          - ruff.toml
+
+  - repo: local
+    hooks:
+      - id: py-dont-allow-requirements-txt
+        name: '[py] disallow requirements.txt'
+        language: fail
+        entry: Usage of requirements.txt is not allowed; use uv to manage dependencies.
+        files: requirements.txt
+
+      - id: ts-dont-allow-package-lock-json
+        name: '[ts] disallow package-lock.json'
+        language: fail
+        entry: Usage of package-lock.json is not allowed; use pnpm to manage dependencies.
+        files: package-lock.json
+
+      - id: ts-dont-allow-yarn-lock
+        name: '[ts] disallow yarn.lock'
+        language: fail
+        entry: Usage of yarn.lock is not allowed; use pnpm to manage dependencies.
+        files: yarn.lock

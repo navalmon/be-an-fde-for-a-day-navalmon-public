@@ -1,0 +1,99 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "WorkflowResult",
+    "description": "The result of executing a multi-step workflow.",
+    "type": "object",
+    "required": [
+        "task_id",
+        "status",
+        "steps_executed"
+    ],
+    "properties": {
+        "task_id": {
+            "type": "string",
+            "description": "Must match the input task_id exactly."
+        },
+        "status": {
+            "type": "string",
+            "enum": [
+                "completed",
+                "partial",
+                "failed"
+            ],
+            "description": "Overall workflow execution status."
+        },
+        "steps_executed": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "required": [
+                    "step",
+                    "tool",
+                    "parameters",
+                    "success"
+                ],
+                "properties": {
+                    "step": {
+                        "type": "integer",
+                        "description": "Step number in execution order."
+                    },
+                    "tool": {
+                        "type": "string",
+                        "description": "Name of the tool called."
+                    },
+                    "parameters": {
+                        "type": "object",
+                        "description": "Parameters passed to the tool."
+                    },
+                    "result_summary": {
+                        "type": "string",
+                        "description": "Brief summary of the tool's response."
+                    },
+                    "success": {
+                        "type": "boolean",
+                        "description": "Whether the tool call succeeded."
+                    }
+                }
+            },
+            "description": "Ordered list of executed steps with tool calls and results."
+        },
+        "accounts_processed": {
+            "type": [
+                "integer",
+                "null"
+            ],
+            "description": "Number of entities processed (task-specific)."
+        },
+        "emails_sent": {
+            "type": [
+                "integer",
+                "null"
+            ],
+            "description": "Number of actions taken (task-specific)."
+        },
+        "emails_skipped": {
+            "type": [
+                "integer",
+                "null"
+            ],
+            "description": "Number of actions skipped (task-specific)."
+        },
+        "skip_reasons": {
+            "type": [
+                "object",
+                "null"
+            ],
+            "additionalProperties": {
+                "type": "integer"
+            },
+            "description": "Breakdown of skip reasons with counts."
+        },
+        "constraints_satisfied": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            },
+            "description": "List of constraint identifiers that were satisfied."
+        }
+    }
+}

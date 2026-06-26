@@ -1,0 +1,18 @@
+# See the following link for more details:
+# https://git-scm.com/docs/gitattributes
+* text eol=lf
+ *.png      binary
+ *.jpg      binary
+ *.jpeg     binary
+ *.gif      binary
+ *.dll      binary
+ *.exe      binary
+ *.ocx      binary
+ *.ico      binary
+ *.ttf      binary
+ *.xlsx     binary
+ *.xlsm     binary
+ *.parquet  binary
+ *.pkl      binary
+ *.enc      binary
+py/data/task2/public_eval_50.json filter=lfs diff=lfs merge=lfs -text

@@ -1,0 +1,15 @@
+packages:
+    # Common libs & apps (synced from fde-libs):
+    # common/
+    #     libs/
+    #     apps/
+    #
+    # Our libs & apps:
+    # libs/
+    #     my-lib/
+    # apps/
+    #     my-app/
+    - "common/libs/*"
+    - "common/apps/*"
+    - "libs/*"
+    - "apps/*"
