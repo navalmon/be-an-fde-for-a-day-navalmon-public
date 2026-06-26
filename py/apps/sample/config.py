@@ -22,10 +22,10 @@ class Settings(BaseSettings):
     model_api_key: str = Field(default="", repr=False)
     model_api_style: Literal["auto", "chat_completions", "responses"] = "auto"
     model_max_tokens: int = Field(default=1024, gt=0)
-    http_timeout_seconds: float = Field(default=20.0, gt=0)
-    model_concurrency: int = Field(default=10, gt=0)
+    http_timeout_seconds: float = Field(default=45.0, gt=0)
+    model_concurrency: int = Field(default=2, gt=0)
     max_retry_attempts: int = Field(default=3, ge=1)
-    retry_base_delay_seconds: float = Field(default=0.5, ge=0)
+    retry_base_delay_seconds: float = Field(default=1.0, ge=0)
     extract_image_detail: Literal["auto", "low", "high"] = "high"
     extract_image_format: Literal["png", "jpeg"] = "png"
     extract_jpeg_quality: int = Field(default=90, ge=1, le=95)

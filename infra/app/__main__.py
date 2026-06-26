@@ -117,9 +117,10 @@ if max_replicas < min_replicas:
 
 cpu = _config_float(config, "cpu", 1.0, minimum=0.25)
 memory = config.get("memory") or "2Gi"
-model_concurrency = _config_int(fde_config, "modelConcurrency", 5, minimum=1)
+model_concurrency = _config_int(fde_config, "modelConcurrency", 2, minimum=1)
 max_retry_attempts = _config_int(fde_config, "maxRetryAttempts", 3, minimum=1)
-http_timeout_seconds = _config_float(fde_config, "httpTimeoutSeconds", 20.0, minimum=1.0)
+http_timeout_seconds = _config_float(fde_config, "httpTimeoutSeconds", 45.0, minimum=1.0)
+retry_base_delay_seconds = _config_float(fde_config, "retryBaseDelaySeconds", 1.0, minimum=0.0)
 
 tags: dict[str, str] = {
     "app": "fdebench-api",
@@ -222,7 +223,7 @@ env_vars: list[app.EnvironmentVarArgs] = [
     app.EnvironmentVarArgs(name="FDE_HTTP_TIMEOUT_SECONDS", value=str(http_timeout_seconds)),
     app.EnvironmentVarArgs(
         name="FDE_RETRY_BASE_DELAY_SECONDS",
-        value=str(_config_float(fde_config, "retryBaseDelaySeconds", 0.5, minimum=0.0)),
+        value=str(retry_base_delay_seconds),
     ),
     app.EnvironmentVarArgs(name="FDE_EXTRACT_IMAGE_DETAIL", value=fde_config.get("extractImageDetail") or "high"),
     app.EnvironmentVarArgs(name="FDE_EXTRACT_IMAGE_FORMAT", value=fde_config.get("extractImageFormat") or "png"),
@@ -322,3 +323,6 @@ pulumi.export("endpoint", endpoint)
 pulumi.export("healthUrl", pulumi.Output.concat(endpoint, "/health"))
 pulumi.export("image", full_image_name)
 pulumi.export("modelConcurrency", model_concurrency)
+pulumi.export("maxRetryAttempts", max_retry_attempts)
+pulumi.export("httpTimeoutSeconds", http_timeout_seconds)
+pulumi.export("retryBaseDelaySeconds", retry_base_delay_seconds)

@@ -78,16 +78,17 @@ Set these from `infra/app` with `pulumi config set <key> <value>`.
 | `fde:triageModelName` | unset | Optional `/triage` model header override |
 | `fde:extractModelName` | unset | Optional `/extract` model header override |
 | `fde:orchestrateModelName` | unset | Optional `/orchestrate` model header override |
-| `fde:modelConcurrency` | `5` | Outbound model-call concurrency throttle |
+| `fde:modelConcurrency` | `2` | Outbound model-call concurrency throttle |
 | `fde:maxRetryAttempts` | `3` | Retry attempts for transient model/tool failures |
-| `fde:httpTimeoutSeconds` | `20` | Shared outbound HTTP timeout |
+| `fde:httpTimeoutSeconds` | `45` | Shared outbound HTTP timeout |
+| `fde:retryBaseDelaySeconds` | `1.0` | Base delay for exponential backoff; `Retry-After` headers still take precedence |
 | `fde:modelMaxTokens` | `1024` | Maximum tokens requested per model call |
 | `fde:extractImageDetail` | `high` | Vision image detail hint |
 | `fde:extractImageFormat` | `png` | Image format sent to the vision model; `jpeg` reduces payload size |
 | `fde:extractJpegQuality` | `90` | JPEG quality when `fde:extractImageFormat=jpeg` |
 | `fde:extractImageMaxDimension` | `3072` | Maximum image dimension before extraction model calls |
 
-For quota-limited subscriptions, keep `maxReplicas=1` and start with `fde:modelConcurrency=3` to `5`.
+For quota-limited subscriptions, keep `maxReplicas=1`, use `fde:modelConcurrency=2`, and keep retries enabled so transient 429s do not turn into schema-shaped null responses.
 
 ## Test the deployment
 

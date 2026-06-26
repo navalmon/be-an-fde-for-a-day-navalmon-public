@@ -44,8 +44,10 @@ Configuration is environment-backed through `py/apps/sample/config.py`. Secrets 
 | `FDE_MODEL_API_STYLE` | `responses` | Uses the Responses API payload shape |
 | `FDE_DEFAULT_MODEL_NAME` | `gpt-5.4-mini` | Default cost-scoring and model name |
 | `FDE_EXTRACT_MODEL_NAME` | `gpt-5.4-mini` | Task 2 vision extraction model |
-| `FDE_MODEL_CONCURRENCY` | `4` | Bounds outbound model calls to avoid quota throttling |
-| `FDE_MAX_RETRY_ATTEMPTS` | `1` | Keeps requests under the platform timeout for the quota-limited deployment |
+| `FDE_MODEL_CONCURRENCY` | `2` | Bounds outbound model calls to avoid quota throttling |
+| `FDE_MAX_RETRY_ATTEMPTS` | `3` | Retries transient model failures instead of immediately returning fallback responses |
+| `FDE_RETRY_BASE_DELAY_SECONDS` | `1.0` | Base delay for exponential backoff; Azure `Retry-After` headers take precedence |
+| `FDE_HTTP_TIMEOUT_SECONDS` | `45` | Allows slower hidden document extraction calls while staying below the platform timeout |
 | `FDE_MODEL_MAX_TOKENS` | `1024` | Default response token budget; extraction raises this to at least 2048 |
 | `FDE_EXTRACT_IMAGE_DETAIL` | `auto` | Vision detail hint |
 | `FDE_EXTRACT_IMAGE_MAX_DIMENSION` | `2048` | Caps image dimensions before model calls |

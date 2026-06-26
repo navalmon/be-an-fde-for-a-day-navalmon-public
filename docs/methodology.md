@@ -123,4 +123,4 @@ Because the Azure subscription and model deployment were quota-limited, I avoide
 - The latest full three-task deployed run was not repeated after JPEG90 to save model tokens. Task 1 and Task 3 code paths were unchanged by that optimization; Task 2 was re-evaluated directly.
 - Task 2 remains the model- and latency-dominant endpoint. Higher quality or higher detail settings may improve extraction resolution but risk worse efficiency.
 - Task 3 is tuned to known workflow families and benchmark constraints. A broader planner could generalize better but would add latency and model dependency.
-- The deployment intentionally caps scale to one replica and model concurrency to four to control subscription spend.
+- The deployment intentionally caps scale to one replica and model concurrency to two to reduce Azure model throttling during larger hidden Task 2 runs.
