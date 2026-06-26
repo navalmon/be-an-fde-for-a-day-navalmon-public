@@ -8,7 +8,7 @@ This submission is a single Python 3.12 FastAPI service deployed as a container 
 |---|---|
 | `GET /health` | Liveness check used by the platform and Container Apps probe |
 | `POST /triage` | Task 1 signal classification and routing |
-| `POST /extract` | Task 2 schema-guided document extraction from base64 PNG images |
+| `POST /extract` | Task 2 schema-guided document extraction from base64 document images |
 | `POST /orchestrate` | Task 3 constrained workflow execution with tool-call traces |
 
 ```text
@@ -48,7 +48,7 @@ Configuration is environment-backed through `py/apps/sample/config.py`. Secrets 
 | `FDE_MAX_RETRY_ATTEMPTS` | `3` | Retries transient model failures instead of immediately returning fallback responses |
 | `FDE_RETRY_BASE_DELAY_SECONDS` | `1.0` | Base delay for exponential backoff; Azure `Retry-After` headers take precedence |
 | `FDE_HTTP_TIMEOUT_SECONDS` | `45` | Allows slower hidden document extraction calls while staying below the platform timeout |
-| `FDE_MODEL_MAX_TOKENS` | `1024` | Default response token budget; extraction raises this to at least 2048 |
+| `FDE_MODEL_MAX_TOKENS` | `1024` | Default response token budget; extraction sizes this dynamically by schema complexity |
 | `FDE_EXTRACT_IMAGE_DETAIL` | `auto` | Vision detail hint |
 | `FDE_EXTRACT_IMAGE_MAX_DIMENSION` | `2048` | Caps image dimensions before model calls |
 | `FDE_EXTRACT_IMAGE_FORMAT` | `jpeg` | Sends optimized JPEG to the model instead of the source PNG |
@@ -56,33 +56,35 @@ Configuration is environment-backed through `py/apps/sample/config.py`. Secrets 
 
 ## Task 1: Signal triage
 
-Task 1 is implemented as a hybrid deterministic triage service optimized for low latency and exact schema compliance.
+Task 1 is implemented as a hybrid deterministic triage service optimized for low latency, exact schema compliance, and adversarial prompt-injection resistance.
 
 1. The service builds classification evidence from the ticket subject, description, reporter, channel, timestamps, and attachments.
 2. Deterministic rules assign category, priority, routing team, escalation, missing-information labels, and remediation text for high-confidence benchmark patterns.
-3. Labels are normalized to the exact enum strings required by the output schema.
-4. Safety-impact and mission-critical cases bias toward escalation and higher priority.
-5. The response always echoes `ticket_id` and returns the required fields, even for ambiguous input.
+3. Guardrails protect clear non-signal, safety-critical, and unsafe-operation cases from being overridden by prompt injection, pasted logs, or model proposals.
+4. Low-confidence or multi-signal cases can ask the model for a structured proposal, but the service accepts it only when it passes enum validation, confidence checks, downgrade checks, and safety constraints.
+5. Labels are normalized to the exact enum strings required by the output schema.
+6. The response always echoes `ticket_id` and returns the required fields, even for ambiguous input.
 
-This design keeps Task 1 latency low while preserving robustness probes. The main tradeoff is that gray-area ownership and missing-information labels must be tuned conservatively because over-emitting labels can reduce score.
+This design keeps Task 1 latency low while preserving robustness probes. The main tradeoff is that gray-area ownership and missing-information labels must be tuned conservatively because over-emitting labels can reduce score. The current code includes a public Task 1 scoring guard (`tests/test_task1_public_eval.py`) so rule changes are measured against the local scorer before deployment.
 
 ## Task 2: Document extraction
 
 Task 2 uses a vision-model pipeline with schema-shaped fallbacks and response normalization.
 
-1. Validate `content_format == "image_base64"` and base64-decode the incoming PNG.
+1. Validate `content_format == "image_base64"` and base64-decode the incoming image bytes.
 2. Parse the per-request `json_schema`.
 3. Build a fallback object from the schema so every requested field has a safe `null` or empty value if extraction fails.
 4. Prepare the image for the model:
+   - accept any Pillow-readable image format rather than relying on a PNG magic-byte gate
    - auto-orient EXIF-rotated images
    - downscale oversized images to the configured max dimension
    - apply autocontrast to low-contrast grayscale inputs
    - encode as JPEG90 for the deployed service to reduce remote model payload size
 5. Send a multimodal request to the configured model with the image data URL, field guide, and JSON schema.
-6. Parse strict JSON and normalize it back to the requested schema, including nested objects, arrays, primitive coercion, enums, and missing fields.
+6. Parse strict JSON, with recovery for fenced or prose-wrapped JSON objects, and normalize it back to the requested schema, including nested objects, arrays, primitive coercion, enums, and missing fields.
 7. Cache successful extraction results by document id, image content, and schema to deduplicate repeated requests and concurrent in-flight calls.
 
-The key production tradeoff is image quality versus latency. PNG at 2048 pixels was accurate but slower over the deployed network path. JPEG90 kept the same model and dimensions while cutting payload size enough to improve both Task 2 latency and score in deployed evaluation.
+The key production tradeoff is image quality versus latency. PNG at 2048 pixels was accurate but slower over the deployed network path. JPEG90 kept the same model and dimensions while cutting payload size enough to improve both Task 2 latency and score in deployed evaluation. Hidden submission telemetry later showed the platform can deliver valid non-PNG image bytes, so the service now lets Pillow validate the image instead of rejecting non-PNG inputs before the model call.
 
 ## Task 3: Workflow orchestration
 
@@ -107,6 +109,7 @@ The app follows the FDEBench HTTP semantics:
 - scored endpoints always include `X-Model-Name`
 - valid-looking task requests avoid unhandled `5xx`; task services return schema-compliant fallbacks when a downstream model or tool fails
 - model and tool calls have bounded timeouts, retries, and concurrency
+- non-sensitive structured telemetry logs hashed identifiers, fallback reasons, model-call durations, image-prep metadata, and Task 1 model-assist decisions without logging document contents, ticket text, or secrets
 
 The shared `run_with_retries` helper honors `Retry-After` and `Retry-After-Ms` on retryable model/tool failures. The Container App keeps one warm replica to reduce cold-start risk and caps scale-out to protect model quota.
 
@@ -131,13 +134,21 @@ Current public endpoint:
 https://fdebench-navalmon-api.lemonpebble-c7043a33.eastus2.azurecontainerapps.io
 ```
 
+Current deployed revision:
+
+```text
+fdebench-navalmon-api--0000010
+fdebenchnavalmonb0238d7e.azurecr.io/fdebench-api:improve-195a48a
+```
+
 ## Tradeoffs
 
 | Decision | Benefit | Cost |
 |---|---|---|
 | Single FastAPI service | Simple deployment and shared resilience behavior | Less isolation between tasks |
-| Deterministic Task 1 rules | Very low latency and stable enums | Requires manual tuning for ambiguous labels |
+| Deterministic + guarded-model Task 1 | Low latency for clear cases and better coverage for ambiguous cases | More validation logic to prevent unsafe model downgrades |
 | Vision model for Task 2 | Required for meaningful image extraction | Dominates latency and model quota usage |
 | JPEG90 Task 2 preprocessing | Lower remote payload and better deployed P95 latency | Possible risk on tiny text if compression is too aggressive |
+| Dynamic Task 2 token budget | Reduces latency on simple schemas while preserving higher configured caps | Complex schemas still require larger model responses |
 | Deterministic Task 3 planner | Predictable traces and constraint handling | Less flexible than a general LLM planner for unseen workflows |
 | Max one Container App replica | Controls subscription/model spend | Limits horizontal throughput |

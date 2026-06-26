@@ -8,9 +8,11 @@ The final submitted service is deployed at:
 https://fdebench-navalmon-api.lemonpebble-c7043a33.eastus2.azurecontainerapps.io
 ```
 
-The latest complete deployed run after the Task 2 JPEG optimization scored `86.5 / 100` with no errored items. That full run happened after the Task 2-only JPEG tuning run, so the repeated public Task 2 images benefited from the service's in-memory extraction cache. For a colder Task 2 latency read, use the Task 2-only JPEG run below: it improved from `77.8` to `84.6` Tier 1 with P95 latency dropping from `15640 ms` to `9703 ms`.
+The latest complete public deployed run after the Task 2 JPEG optimization scored `86.5 / 100` with no errored items. That full run happened after the Task 2-only JPEG tuning run, so the repeated public Task 2 images benefited from the service's in-memory extraction cache. For a colder Task 2 latency read, use the Task 2-only JPEG run below: it improved from `77.8` to `84.6` Tier 1 with P95 latency dropping from `15640 ms` to `9703 ms`.
 
 Using the colder Task 2-only JPEG result with the measured Task 1 and Task 3 scores gives a conservative post-JPEG composite estimate of approximately `85.1`.
+
+The latest hidden submission scored `69.5`. It confirmed the non-PNG Task 2 fix: hidden Task 2 resolution improved from `1.0` to `82.1`. The currently deployed revision `fdebench-navalmon-api--0000010` includes additional Task 1 and Task 2 reliability changes after that hidden run and has not yet been submitted.
 
 ## Run configurations
 
@@ -20,6 +22,8 @@ Using the colder Task 2-only JPEG result with the measured Task 1 and Task 3 sco
 | Full deployed run | Azure Container Apps HTTPS endpoint | `uv run python run_eval.py --endpoint <endpoint>` from `py\apps\eval` | 2026-06-25 | Model configured as `gpt-5.4-mini`; PNG Task 2 preprocessing |
 | Task 2 JPEG tuning run | Azure Container Apps HTTPS endpoint | `uv run python run_eval.py --endpoint <endpoint> --task extract` from `py\apps\eval` | 2026-06-25 | Same model with JPEG90, max dimension 2048, detail auto |
 | Final full deployed regression run | Azure Container Apps HTTPS endpoint | `uv run python run_eval.py --endpoint <endpoint>` from `py\apps\eval` | 2026-06-25 | Same model and JPEG90 settings; Task 2 public items were warm-cache repeats |
+| Hidden submission 3 | FDEBench hosted judge | Platform submission | 2026-06-26 | First hidden run after the non-PNG Task 2 image fix |
+| Current deployed improvement revision | Azure Container Apps HTTPS endpoint | Smoke tests plus focused local tests | 2026-06-26 | Public commit `195a48a`; deployed as image `improve-195a48a` |
 
 ## Final full deployed regression run
 
@@ -149,11 +153,67 @@ This run remains useful because it proves the API contract and resilience behavi
 
 The local Task 2 score is low because no vision model was configured; the endpoint returned schema-shaped fallbacks. The deployed Task 2 runs above are the meaningful extraction measurements.
 
+## Hidden submission 3
+
+Submission 3 was the first hidden run after the non-PNG image fix and used:
+
+```text
+fdebench-navalmon-api--0000009
+fdebenchnavalmonb0238d7e.azurecr.io/fdebench-api:nonpng-4c8d913
+```
+
+| Metric | Score |
+|---|---:|
+| FDEBench Composite | 69.5 |
+| Resolution (avg) | 66.5 |
+| Efficiency (avg) | 62.5 |
+| Robustness (avg) | 79.1 |
+
+| Task | Resolution | Efficiency | Robustness | P95 latency |
+|---|---:|---:|---:|---:|
+| Signal Triage | 43.3 | 55.4 | 64.2 | 3119 ms |
+| Document Extraction | 82.1 | 36.0 | 89.3 | 31104 ms |
+| Workflow Orchestration | 74.2 | 96.0 | 83.9 | 137 ms |
+
+### Hidden telemetry from submission 3
+
+Azure Log Analytics confirmed the hidden run used the fixed image. Task 2 no longer failed at image decoding; instead, the remaining losses were latency and model-output reliability:
+
+| Signal | Count |
+|---|---:|
+| `/extract` posts | 542 |
+| `model_result_unavailable` fallbacks | 37 |
+| `extract_model_call_failed` | 19 |
+| `ModelResponseError: model response did not contain valid JSON` | 19 |
+| `invalid_base64` fallbacks | 0 |
+| `invalid_image_bytes` fallbacks | 0 |
+
+The latest revision `0000010` responds to those findings by:
+
+- making extraction start/success telemetry visible in Log Analytics
+- recovering fenced or prose-wrapped JSON objects from model output
+- dynamically sizing extraction output tokens by schema complexity
+- adding a Task 1 public eval guard and triage decision telemetry
+- tightening Task 1 vendor/outreach, safety, and model-assist guardrails
+
+Focused validation for this revision:
+
+| Check | Result |
+|---|---|
+| `uv run pytest tests/test_model_client.py -q` | 24 passed |
+| `uv run pytest tests/test_task1_public_eval.py -q` | 1 passed |
+| `uv run pytest tests/test_task_services.py -k "triage_service" -q` | 48 passed |
+| `uv run pytest tests/test_task_services.py -k "extraction_service" -q` | 12 passed |
+| `uv run pytest -q` from `py/apps/sample` | 122 passed |
+| `uv run pyright apps/sample` from `py` | 0 errors |
+
+Live smoke tests on revision `0000010` passed for `/health`, `/triage`, `/extract` with JPEG input, and `/orchestrate`.
+
 ## Error analysis
 
 ### Task 1
 
-Task 1 is strong and fast. Remaining losses are likely from ambiguous ownership and missing-information cases where the public examples can reasonably map to more than one team or missing field. Further tuning should be conservative because broad missing-information rules previously risked over-emission.
+Task 1 is strong on the public set but weak on hidden submission 3. Remaining losses are likely from ambiguous ownership, missing-information labels, and adversarial phrasing. The latest public Task 1 guard improved local public resolution from `85.4` to `88.5`, mostly by fixing false positives and missing-information noise, but hidden improvement still needs confirmation from a future submission.
 
 ### Task 2
 
@@ -167,6 +227,8 @@ Task 2 is the highest-value remaining optimization area. JPEG90 materially impro
 
 The service prefers `null` for invisible fields rather than hallucinating. That preserves schema validity and avoids confidently wrong values, but it can reduce recall when the model is uncertain.
 
+Submission 3 showed the non-PNG root cause was resolved, but Task 2 p95 latency remained above the Tier 1 worst threshold. The current revision focuses on lower avoidable latency from invalid JSON retries/fallbacks and better telemetry rather than further reducing image quality, because hidden resolution is now good.
+
 ### Task 3
 
 Task 3 is robust and low latency because it uses deterministic workflow plans and bounded tool calls. Remaining errors are expected in workflows that require response-specific branching not covered by the current planner or where a hidden workflow family uses a new tool sequence.
@@ -174,5 +236,6 @@ Task 3 is robust and low latency because it uses deterministic workflow plans an
 ### Cross-task limitations
 
 - The latest measured full deployed composite is from the pre-JPEG Task 2 run; the post-JPEG composite is estimated from separate Task 2 measurement.
+- The latest hidden scored composite is from revision `0000009`; revision `0000010` is deployed but unsubmitted.
 - The live deployment is tuned for a quota-limited Azure subscription, not maximum throughput.
 - Hidden platform data can differ from public eval examples, especially for Task 2 document layouts and Task 3 workflow families.
