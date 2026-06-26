@@ -110,6 +110,13 @@ class FailingExtractionModelClient(FakeExtractionModelClient):
         )
 
 
+def _sample_image_base64(image_format: str = "PNG") -> str:
+    image = Image.new("RGB", (16, 16), "white")
+    buffer = BytesIO()
+    image.save(buffer, format=image_format)
+    return base64.b64encode(buffer.getvalue()).decode("ascii")
+
+
 def _triage_request() -> TriageRequest:
     return TriageRequest(
         ticket_id="SIG-1001",
@@ -845,7 +852,7 @@ async def test_extraction_service_preserves_stub_contract() -> None:
     request = ExtractRequest(
         document_id="DOC-1001",
         content_format="image_base64",
-        content="iVBORw0KGgo=",
+        content=_sample_image_base64(),
         json_schema=None,
     )
 
@@ -1010,7 +1017,7 @@ async def test_extraction_service_uses_model_payload_and_schema_shape() -> None:
     request = ExtractRequest(
         document_id="DOC-1002",
         content_format="image_base64",
-        content="iVBORw0KGgo=",
+        content=_sample_image_base64(),
         json_schema='{"type":"object","properties":{"amount":{"type":"number"},"approved":{"type":"boolean"}}}',
     )
 
@@ -1029,13 +1036,29 @@ async def test_extraction_service_uses_model_payload_and_schema_shape() -> None:
 
 
 @pytest.mark.asyncio
+async def test_extraction_service_accepts_jpeg_base64_images() -> None:
+    model_client = FakeExtractionModelClient({"amount": "$7.00"})
+    request = ExtractRequest(
+        document_id="DOC-1006",
+        content_format="image_base64",
+        content=_sample_image_base64("JPEG"),
+        json_schema='{"type":"object","properties":{"amount":{"type":"number"}}}',
+    )
+
+    response = await ExtractionService(model_client=model_client).extract(request)
+
+    assert model_client.calls == 1
+    assert response.model_extra == {"amount": 7.0}
+
+
+@pytest.mark.asyncio
 async def test_extraction_service_caches_repeated_model_results() -> None:
     model_client = FakeExtractionModelClient({"amount": "$42.00"})
     service = ExtractionService(model_client=model_client)
     request = ExtractRequest(
         document_id="DOC-1002",
         content_format="image_base64",
-        content="iVBORw0KGgo=",
+        content=_sample_image_base64(),
         json_schema='{"type":"object","properties":{"amount":{"type":"number"}}}',
     )
 
@@ -1054,7 +1077,7 @@ async def test_extraction_service_coalesces_concurrent_cache_misses() -> None:
     request = ExtractRequest(
         document_id="DOC-1002",
         content_format="image_base64",
-        content="iVBORw0KGgo=",
+        content=_sample_image_base64(),
         json_schema='{"type":"object","properties":{"amount":{"type":"number"}}}',
     )
 
@@ -1071,7 +1094,7 @@ async def test_extraction_service_cancelled_waiter_does_not_poison_singleflight(
     request = ExtractRequest(
         document_id="DOC-1002",
         content_format="image_base64",
-        content="iVBORw0KGgo=",
+        content=_sample_image_base64(),
         json_schema='{"type":"object","properties":{"amount":{"type":"number"}}}',
     )
 
@@ -1103,12 +1126,12 @@ async def test_extraction_service_returns_schema_fallback_on_invalid_image(caplo
     assert model_client.calls == 0
     assert response.model_extra == {"amount": None, "lines": []}
     assert "event=extract_fallback_returned" in caplog.text
-    assert "reason=invalid_base64_or_png" in caplog.text
+    assert "reason=invalid_base64" in caplog.text
     assert "document_hash=" in caplog.text
 
 
 @pytest.mark.asyncio
-async def test_extraction_service_rejects_non_png_base64() -> None:
+async def test_extraction_service_rejects_non_image_base64(caplog: pytest.LogCaptureFixture) -> None:
     model_client = FakeExtractionModelClient({"amount": 1})
     request = ExtractRequest(
         document_id="DOC-1004",
@@ -1117,10 +1140,13 @@ async def test_extraction_service_rejects_non_png_base64() -> None:
         json_schema='{"type":"object","properties":{"amount":{"type":"number"}}}',
     )
 
-    response = await ExtractionService(model_client=model_client).extract(request)
+    with caplog.at_level(logging.WARNING, logger="extraction.service"):
+        response = await ExtractionService(model_client=model_client).extract(request)
 
     assert model_client.calls == 0
     assert response.model_extra == {"amount": None}
+    assert "event=extract_fallback_returned" in caplog.text
+    assert "reason=invalid_image_bytes" in caplog.text
 
 
 @pytest.mark.asyncio
@@ -1129,7 +1155,7 @@ async def test_extraction_service_logs_model_status_before_fallback(caplog: pyte
     request = ExtractRequest(
         document_id="DOC-1005",
         content_format="image_base64",
-        content="iVBORw0KGgo=",
+        content=_sample_image_base64(),
         json_schema='{"type":"object","properties":{"amount":{"type":"number"}}}',
     )
 

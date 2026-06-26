@@ -25,7 +25,6 @@ from extraction.schema_tools import output_skeleton
 from extraction.schema_tools import parse_schema
 from extraction.schema_tools import schema_field_guide
 
-_PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 _LOG_SNIPPET_LENGTH = 300
 logger = logging.getLogger(__name__)
 
@@ -50,9 +49,9 @@ class ExtractionService:
         if request.content_format != "image_base64":
             _log_extract_fallback(context, reason="unsupported_content_format", content_format=request.content_format)
             return _response_from_fields(request.document_id, fallback)
-        image_bytes = _decode_png_bytes(request.content)
+        image_bytes = _decode_image_bytes(request.content)
         if image_bytes is None:
-            _log_extract_fallback(context, reason="invalid_base64_or_png", content_length=len(request.content))
+            _log_extract_fallback(context, reason="invalid_base64", content_length=len(request.content))
             return _response_from_fields(request.document_id, fallback)
 
         if self._model_client is None or not self._model_client.is_configured():
@@ -136,6 +135,10 @@ class ExtractionService:
             low_contrast_threshold=self._settings.extract_low_contrast_threshold,
         )
         context = _request_log_context(request, schema)
+        if prepared_image.width is None or prepared_image.height is None:
+            _log_extract_fallback(context, reason="invalid_image_bytes", image_bytes=len(image_bytes))
+            return output_skeleton(schema)
+
         model_name = self._settings.model_name_for_path("/extract")
         start_time = time.perf_counter()
         logger.info(
@@ -268,14 +271,11 @@ def _build_vision_content(
     ]
 
 
-def _decode_png_bytes(value: str) -> bytes | None:
+def _decode_image_bytes(value: str) -> bytes | None:
     try:
-        decoded = base64.b64decode(value, validate=True)
+        return base64.b64decode(value, validate=True)
     except (binascii.Error, ValueError, TypeError):
         return None
-    if not decoded.startswith(_PNG_SIGNATURE):
-        return None
-    return decoded
 
 
 def _request_log_context(request: ExtractRequest, schema: dict[str, Any]) -> dict[str, str | int]:
