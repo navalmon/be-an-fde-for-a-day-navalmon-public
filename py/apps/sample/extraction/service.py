@@ -141,7 +141,7 @@ class ExtractionService:
 
         model_name = self._settings.model_name_for_path("/extract")
         start_time = time.perf_counter()
-        logger.info(
+        logger.warning(
             "telemetry=true event=extract_model_call_start document_hash=%s schema_hash=%s model=%s original_image_bytes=%d "
             "prepared_media_type=%s prepared_base64_chars=%d prepared_width=%s prepared_height=%s "
             "prepared_original_width=%s prepared_original_height=%s prepared_resized=%s "
@@ -182,7 +182,7 @@ class ExtractionService:
                 ],
                 model_name=model_name,
                 temperature=0.0,
-                max_tokens=max(self._settings.model_max_tokens, 2048),
+                max_tokens=_extract_max_tokens(schema, configured_max_tokens=self._settings.model_max_tokens),
             )
         except ModelProviderError as exc:
             duration_ms = _elapsed_ms(start_time)
@@ -194,12 +194,20 @@ class ExtractionService:
             return None
 
         fields = normalize_to_schema(payload, schema)
-        logger.info(
-            "telemetry=true event=extract_model_call_success document_hash=%s schema_hash=%s duration_ms=%d normalized_field_count=%d",
+        logger.warning(
+            "telemetry=true event=extract_model_call_success document_hash=%s schema_hash=%s schema_top_level_fields=%s "
+            "duration_ms=%d normalized_field_count=%d prepared_media_type=%s prepared_base64_chars=%d "
+            "prepared_width=%s prepared_height=%s image_detail=%s",
             context["document_hash"],
             context["schema_hash"],
+            context["schema_top_level_fields"],
             _elapsed_ms(start_time),
             len(fields),
+            prepared_image.media_type,
+            len(prepared_image.content_base64),
+            prepared_image.width,
+            prepared_image.height,
+            prepared_image.detail,
         )
         return fields
 
@@ -285,6 +293,24 @@ def _request_log_context(request: ExtractRequest, schema: dict[str, Any]) -> dic
         "schema_hash": _short_hash(schema_text),
         "schema_top_level_fields": len(schema.get("properties", {})) if isinstance(schema.get("properties"), dict) else 0,
     }
+
+
+def _extract_max_tokens(schema: dict[str, Any], *, configured_max_tokens: int) -> int:
+    top_level_fields = schema.get("properties", {})
+    field_count = len(top_level_fields) if isinstance(top_level_fields, dict) else 0
+    dynamic_budget = 512 + (field_count * 128) + (_nested_schema_complexity(schema) * 64)
+    return max(configured_max_tokens, min(dynamic_budget, 2048))
+
+
+def _nested_schema_complexity(value: object) -> int:
+    if isinstance(value, dict):
+        total = len(value)
+        for child in value.values():
+            total += _nested_schema_complexity(child)
+        return total
+    if isinstance(value, list):
+        return sum(_nested_schema_complexity(item) for item in value)
+    return 0
 
 
 def _short_hash(value: str) -> str:

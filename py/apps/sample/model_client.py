@@ -68,12 +68,22 @@ class ChatMessage:
 
 
 def parse_json_object(text: str) -> dict[str, Any]:
-    """Parse a JSON object from plain text or a fenced JSON block."""
+    """Parse a JSON object from plain text, fenced JSON, or a wrapped JSON object."""
     candidate = _json_candidate(text)
+    try:
+        return _parse_json_candidate(candidate)
+    except ModelResponseError as first_error:
+        embedded = _first_balanced_json_object(candidate)
+        if embedded is None or embedded == candidate.strip():
+            raise first_error from first_error.__cause__
+        return _parse_json_candidate(embedded)
+
+
+def _parse_json_candidate(candidate: str) -> dict[str, Any]:
     try:
         parsed = json.loads(candidate, parse_constant=_reject_json_constant)
     except (ValueError, RecursionError) as exc:
-        msg = "model response did not contain valid JSON"
+        msg = _json_parse_error_message(candidate)
         raise ModelResponseError(msg) from exc
     if not isinstance(parsed, dict):
         msg = "model response JSON must be an object"
@@ -82,12 +92,51 @@ def parse_json_object(text: str) -> dict[str, Any]:
     return parsed
 
 
+def _json_parse_error_message(candidate: str) -> str:
+    stripped = candidate.lstrip()
+    first_char = stripped[:1] or "<empty>"
+    return f"model response did not contain valid JSON: chars={len(candidate)} first_non_ws={first_char!r}"
+
+
 def _json_candidate(text: str) -> str:
     stripped = text.strip()
     match = _JSON_BLOCK_PATTERN.search(stripped)
     if match is not None:
         return match.group(1).strip()
     return stripped
+
+
+def _first_balanced_json_object(text: str) -> str | None:
+    start = text.find("{")
+    if start < 0:
+        return None
+
+    depth = 0
+    in_string = False
+    escape = False
+    for index in range(start, len(text)):
+        char = text[index]
+        if in_string:
+            if escape:
+                escape = False
+            elif char == "\\":
+                escape = True
+            elif char == '"':
+                in_string = False
+            continue
+
+        if char == '"':
+            in_string = True
+        elif char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if depth == 0:
+                return text[start : index + 1]
+            if depth < 0:
+                return None
+
+    return None
 
 
 def _reject_json_constant(value: str) -> NoReturn:

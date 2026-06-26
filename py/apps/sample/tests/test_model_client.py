@@ -27,9 +27,15 @@ def test_parse_json_object_rejects_invalid_json() -> None:
         parse_json_object("not json")
 
 
-def test_parse_json_object_rejects_wrapped_plain_json() -> None:
-    with pytest.raises(ModelResponseError):
-        parse_json_object('prefix {"ok": true} suffix')
+def test_parse_json_object_recovers_wrapped_plain_json() -> None:
+    assert parse_json_object('prefix {"ok": true} suffix') == {"ok": True}
+
+
+def test_parse_json_object_recovers_wrapped_json_with_braces_in_strings() -> None:
+    assert parse_json_object('Here is JSON: {"text": "keep {this} literal", "ok": true}\nThanks') == {
+        "text": "keep {this} literal",
+        "ok": True,
+    }
 
 
 def test_parse_json_object_rejects_non_finite_numbers() -> None:

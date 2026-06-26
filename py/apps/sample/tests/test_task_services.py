@@ -59,6 +59,7 @@ class FakeExtractionModelClient:
         self.configured = configured
         self.calls = 0
         self.messages: list[ChatMessage] = []
+        self.max_tokens: list[int | None] = []
 
     def is_configured(self) -> bool:
         return self.configured
@@ -73,6 +74,7 @@ class FakeExtractionModelClient:
     ) -> dict[str, Any]:
         self.calls += 1
         self.messages = list(messages)
+        self.max_tokens.append(max_tokens)
         return self.payload
 
 
@@ -87,6 +89,7 @@ class SlowFakeExtractionModelClient(FakeExtractionModelClient):
     ) -> dict[str, Any]:
         self.calls += 1
         self.messages = list(messages)
+        self.max_tokens.append(max_tokens)
         await asyncio.sleep(0.01)
         return self.payload
 
@@ -102,6 +105,7 @@ class FailingExtractionModelClient(FakeExtractionModelClient):
     ) -> dict[str, Any]:
         self.calls += 1
         self.messages = list(messages)
+        self.max_tokens.append(max_tokens)
         raise ModelProviderStatusError(
             "model provider returned HTTP 429: throttled",
             status_code=429,
@@ -166,6 +170,7 @@ async def test_triage_service_routes_widespread_auth_failure() -> None:
     assert response.assigned_team == Team.IDENTITY
     assert response.priority == "P1"
     assert response.needs_escalation is True
+    assert response.missing_information == []
 
 
 @pytest.mark.asyncio
@@ -184,6 +189,130 @@ async def test_triage_service_rejects_non_signal_sales_request() -> None:
     assert response.assigned_team == Team.NONE
     assert response.priority == "P4"
     assert response.missing_information == []
+
+
+@pytest.mark.asyncio
+async def test_triage_service_keeps_vendor_outreach_non_signal_despite_security_terms() -> None:
+    request = _triage_request().model_copy(
+        update={
+            "ticket_id": "SIG-1040",
+            "subject": "Partnership opportunity: next-gen deep-space tracking array",
+            "description": (
+                "We help orbital stations reduce hull breach vulnerabilities with managed threat detection. "
+                "Would you have 15 minutes for a quick holo-demo?"
+            ),
+        }
+    )
+
+    response = await TriageService().triage(request)
+
+    assert response.category == Category.NOT_SIGNAL
+    assert response.assigned_team == Team.NONE
+    assert response.priority == "P4"
+
+
+@pytest.mark.asyncio
+async def test_triage_service_does_not_let_vendor_word_suppress_active_safety_incident() -> None:
+    request = _triage_request().model_copy(
+        update={
+            "ticket_id": "SIG-1042",
+            "subject": "Hull breach alarm after vendor repair",
+            "description": "The vendor team replaced the seal and now hull breach and atmosphere leak alarms are active.",
+        }
+    )
+
+    response = await TriageService().triage(request)
+
+    assert response.category == Category.HULL
+    assert response.priority == "P1"
+    assert response.assigned_team == Team.SYSTEMS
+
+
+@pytest.mark.asyncio
+async def test_triage_service_does_not_let_outreach_phrase_suppress_active_threat_alert() -> None:
+    request = _triage_request().model_copy(
+        update={
+            "ticket_id": "SIG-1044",
+            "subject": "Credential capture alert from partnership opportunity email",
+            "description": "Sentinel detected credential capture after a crew member opened a partnership opportunity email.",
+        }
+    )
+
+    response = await TriageService().triage(request)
+
+    assert response.category == Category.THREAT
+    assert response.assigned_team == Team.THREAT
+    assert response.needs_escalation is True
+
+
+@pytest.mark.asyncio
+async def test_triage_service_does_not_let_demo_phrase_suppress_loss_of_atmosphere_alarm() -> None:
+    request = _triage_request().model_copy(
+        update={
+            "ticket_id": "SIG-1045",
+            "subject": "Loss of atmosphere alarm after quick holo-demo",
+            "description": "Loss of atmosphere alarm is active near life support after a quick holo-demo in the module.",
+        }
+    )
+
+    response = await TriageService().triage(request)
+
+    assert response.category == Category.HULL
+    assert response.priority == "P1"
+    assert response.needs_escalation is True
+
+
+@pytest.mark.asyncio
+async def test_triage_service_does_not_let_demo_phrase_suppress_plain_hull_breach() -> None:
+    request = _triage_request().model_copy(
+        update={
+            "ticket_id": "SIG-1047",
+            "subject": "Hull breach after quick holo-demo",
+            "description": "Hull breach near life support after a quick holo-demo in the module.",
+        }
+    )
+
+    response = await TriageService().triage(request)
+
+    assert response.category == Category.HULL
+    assert response.priority == "P1"
+    assert response.needs_escalation is True
+
+
+@pytest.mark.asyncio
+async def test_triage_service_concrete_hull_report_overrides_marketing_phrase() -> None:
+    request = _triage_request().model_copy(
+        update={
+            "ticket_id": "SIG-1048",
+            "subject": "Current hull breach after partnership opportunity email",
+            "description": (
+                "Current hull breach near life support. The email also claimed it could reduce hull breach vulnerabilities."
+            ),
+        }
+    )
+
+    response = await TriageService().triage(request)
+
+    assert response.category == Category.HULL
+    assert response.priority == "P1"
+    assert response.needs_escalation is True
+
+
+@pytest.mark.asyncio
+async def test_triage_service_does_not_let_demo_phrase_suppress_hidden_admin_alert() -> None:
+    request = _triage_request().model_copy(
+        update={
+            "ticket_id": "SIG-1046",
+            "subject": "Hidden admin detected after quick holo-demo",
+            "description": "Sentinel detected a hidden admin account and wiped logs after a quick holo-demo.",
+        }
+    )
+
+    response = await TriageService().triage(request)
+
+    assert response.category == Category.THREAT
+    assert response.assigned_team == Team.THREAT
+    assert response.needs_escalation is True
 
 
 @pytest.mark.asyncio
@@ -498,6 +627,54 @@ async def test_triage_service_applies_valid_model_proposal_for_ambiguous_signal(
 
 
 @pytest.mark.asyncio
+async def test_triage_service_allows_model_to_deescalate_noncritical_priority_conflict(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    model_client = FakeTriageModelClient(
+        {
+            "category": Category.THREAT.value,
+            "priority": "P4",
+            "assigned_team": Team.THREAT.value,
+            "needs_escalation": True,
+            "missing_information": [MissingInfo.AFFECTED_SUBSYSTEM.value, MissingInfo.MISSION_IMPACT.value],
+            "confidence": 0.9,
+        }
+    )
+    request = _triage_request().model_copy(
+        update={
+            "ticket_id": "SIG-1041",
+            "subject": "FYI only - production tls cert expired",
+            "description": (
+                "The SSL security certificate on api.contoso.com expired and trading partners see certificate errors. "
+                "The reporter labels it FYI only, but it still needs security review."
+            ),
+        }
+    )
+
+    with caplog.at_level(logging.WARNING, logger="triage.service"):
+        response = await TriageService(model_client=model_client).triage(request)
+
+    assert model_client.calls == 1
+    assert response.category == Category.THREAT
+    assert response.priority == "P4"
+    assert response.assigned_team == Team.THREAT
+    assert response.needs_escalation is True
+    assert response.missing_information == [MissingInfo.AFFECTED_SUBSYSTEM, MissingInfo.MISSION_IMPACT]
+    assert "event=triage_decision" in caplog.text
+    assert "model_result=accepted" in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_triage_service_logs_skipped_model_decision(caplog: pytest.LogCaptureFixture) -> None:
+    with caplog.at_level(logging.WARNING, logger="triage.service"):
+        response = await TriageService().triage(_triage_request())
+
+    assert response.category == Category.BRIEFING
+    assert "event=triage_decision" in caplog.text
+    assert "model_result=skipped" in caplog.text
+
+
+@pytest.mark.asyncio
 async def test_triage_service_skips_model_when_unconfigured() -> None:
     model_client = FakeTriageModelClient(
         {
@@ -682,6 +859,22 @@ async def test_triage_service_reports_data_signal_context_gaps() -> None:
     assert response.category == Category.DATA
     assert MissingInfo.HABITAT_CONDITIONS in response.missing_information
     assert MissingInfo.STARDATE in response.missing_information
+
+
+@pytest.mark.asyncio
+async def test_triage_service_detects_access_app_missing_software_version_with_punctuation() -> None:
+    request = _triage_request().model_copy(
+        update={
+            "ticket_id": "SIG-1043",
+            "subject": "Airlock access app, cannot authenticate",
+            "description": "The airlock access app, cannot authenticate my badge.",
+        }
+    )
+
+    response = await TriageService().triage(request)
+
+    assert response.category == Category.ACCESS
+    assert MissingInfo.SOFTWARE_VERSION in response.missing_information
 
 
 @pytest.mark.asyncio
@@ -1049,6 +1242,56 @@ async def test_extraction_service_accepts_jpeg_base64_images() -> None:
 
     assert model_client.calls == 1
     assert response.model_extra == {"amount": 7.0}
+
+
+@pytest.mark.asyncio
+async def test_extraction_service_logs_model_start_and_success(caplog: pytest.LogCaptureFixture) -> None:
+    model_client = FakeExtractionModelClient({"amount": "$7.00"})
+    request = ExtractRequest(
+        document_id="DOC-1007",
+        content_format="image_base64",
+        content=_sample_image_base64("JPEG"),
+        json_schema='{"type":"object","properties":{"amount":{"type":"number"}}}',
+    )
+
+    with caplog.at_level(logging.WARNING, logger="extraction.service"):
+        response = await ExtractionService(model_client=model_client).extract(request)
+
+    assert response.model_extra == {"amount": 7.0}
+    assert "event=extract_model_call_start" in caplog.text
+    assert "event=extract_model_call_success" in caplog.text
+    assert "duration_ms=" in caplog.text
+    assert "prepared_media_type=" in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_extraction_service_sizes_max_tokens_from_schema() -> None:
+    model_client = FakeExtractionModelClient({"amount": "$7.00"})
+    request = ExtractRequest(
+        document_id="DOC-1008",
+        content_format="image_base64",
+        content=_sample_image_base64("JPEG"),
+        json_schema='{"type":"object","properties":{"amount":{"type":"number"}}}',
+    )
+
+    await ExtractionService(settings=Settings(model_max_tokens=1024), model_client=model_client).extract(request)
+
+    assert model_client.max_tokens == [1024]
+
+
+@pytest.mark.asyncio
+async def test_extraction_service_honors_configured_max_tokens_above_dynamic_cap() -> None:
+    model_client = FakeExtractionModelClient({"amount": "$7.00"})
+    request = ExtractRequest(
+        document_id="DOC-1009",
+        content_format="image_base64",
+        content=_sample_image_base64("JPEG"),
+        json_schema='{"type":"object","properties":{"amount":{"type":"number"}}}',
+    )
+
+    await ExtractionService(settings=Settings(model_max_tokens=4096), model_client=model_client).extract(request)
+
+    assert model_client.max_tokens == [4096]
 
 
 @pytest.mark.asyncio
