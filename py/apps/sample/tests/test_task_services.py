@@ -3,6 +3,7 @@
 import asyncio
 import base64
 import json
+import logging
 from collections.abc import Sequence
 from io import BytesIO
 from typing import Any
@@ -15,6 +16,7 @@ from extraction.schema_tools import normalize_to_schema
 from extraction.schema_tools import parse_schema
 from extraction.service import ExtractionService
 from model_client import ChatMessage
+from model_client import ModelProviderStatusError
 from models import Category
 from models import ExtractRequest
 from models import MissingInfo
@@ -87,6 +89,25 @@ class SlowFakeExtractionModelClient(FakeExtractionModelClient):
         self.messages = list(messages)
         await asyncio.sleep(0.01)
         return self.payload
+
+
+class FailingExtractionModelClient(FakeExtractionModelClient):
+    async def complete_json(
+        self,
+        *,
+        messages: Sequence[ChatMessage],
+        model_name: str,
+        temperature: float = 0.0,
+        max_tokens: int | None = None,
+    ) -> dict[str, Any]:
+        self.calls += 1
+        self.messages = list(messages)
+        raise ModelProviderStatusError(
+            "model provider returned HTTP 429: throttled",
+            status_code=429,
+            detail="throttled",
+            retry_after_seconds="2",
+        )
 
 
 def _triage_request() -> TriageRequest:
@@ -1067,7 +1088,7 @@ async def test_extraction_service_cancelled_waiter_does_not_poison_singleflight(
 
 
 @pytest.mark.asyncio
-async def test_extraction_service_returns_schema_fallback_on_invalid_image() -> None:
+async def test_extraction_service_returns_schema_fallback_on_invalid_image(caplog: pytest.LogCaptureFixture) -> None:
     model_client = FakeExtractionModelClient({"amount": 1})
     request = ExtractRequest(
         document_id="DOC-1003",
@@ -1076,10 +1097,14 @@ async def test_extraction_service_returns_schema_fallback_on_invalid_image() -> 
         json_schema='{"type":"object","properties":{"amount":{"type":"number"},"lines":{"type":"array"}}}',
     )
 
-    response = await ExtractionService(model_client=model_client).extract(request)
+    with caplog.at_level(logging.WARNING, logger="extraction.service"):
+        response = await ExtractionService(model_client=model_client).extract(request)
 
     assert model_client.calls == 0
     assert response.model_extra == {"amount": None, "lines": []}
+    assert "event=extract_fallback_returned" in caplog.text
+    assert "reason=invalid_base64_or_png" in caplog.text
+    assert "document_hash=" in caplog.text
 
 
 @pytest.mark.asyncio
@@ -1096,6 +1121,28 @@ async def test_extraction_service_rejects_non_png_base64() -> None:
 
     assert model_client.calls == 0
     assert response.model_extra == {"amount": None}
+
+
+@pytest.mark.asyncio
+async def test_extraction_service_logs_model_status_before_fallback(caplog: pytest.LogCaptureFixture) -> None:
+    model_client = FailingExtractionModelClient({})
+    request = ExtractRequest(
+        document_id="DOC-1005",
+        content_format="image_base64",
+        content="iVBORw0KGgo=",
+        json_schema='{"type":"object","properties":{"amount":{"type":"number"}}}',
+    )
+
+    with caplog.at_level(logging.WARNING, logger="extraction.service"):
+        response = await ExtractionService(model_client=model_client).extract(request)
+
+    assert model_client.calls == 1
+    assert response.model_extra == {"amount": None}
+    assert "event=extract_model_call_failed" in caplog.text
+    assert "status_code=429" in caplog.text
+    assert "retry_after=2" in caplog.text
+    assert "event=extract_fallback_returned" in caplog.text
+    assert "reason=model_result_unavailable" in caplog.text
 
 
 @pytest.mark.asyncio

@@ -11,6 +11,7 @@ from model_client import ChatMessage
 from model_client import ModelClient
 from model_client import ModelProviderError
 from model_client import ModelProviderNotConfigured
+from model_client import ModelProviderStatusError
 from model_client import ModelResponseError
 from model_client import parse_json_object
 
@@ -344,11 +345,14 @@ async def test_model_client_wraps_provider_http_status_errors() -> None:
         model_semaphore=asyncio.Semaphore(1),
     )
 
-    with pytest.raises(ModelProviderError, match="HTTP 400: Unsupported parameter"):
+    with pytest.raises(ModelProviderStatusError, match="HTTP 400: Unsupported parameter") as exc_info:
         await client.complete_json(
             messages=[ChatMessage(role="user", content="Return JSON.")],
             model_name="gpt-test",
         )
+
+    assert exc_info.value.status_code == 400
+    assert exc_info.value.detail == "Unsupported parameter: max_tokens"
 
     await http_client.aclose()
 

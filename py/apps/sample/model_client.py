@@ -30,6 +30,23 @@ class ModelProviderError(RuntimeError):
     """Base class for model-provider failures."""
 
 
+class ModelProviderStatusError(ModelProviderError):
+    """Raised when the model provider returns a non-success HTTP status."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        status_code: int,
+        detail: str,
+        retry_after_seconds: str | None,
+    ) -> None:
+        super().__init__(message)
+        self.status_code = status_code
+        self.detail = detail
+        self.retry_after_seconds = retry_after_seconds
+
+
 class ModelProviderNotConfigured(ModelProviderError):
     """Raised when model-provider settings are missing."""
 
@@ -440,7 +457,12 @@ def _model_provider_status_error(exc: httpx.HTTPStatusError) -> ModelProviderErr
     msg = f"model provider returned HTTP {response.status_code}"
     if detail:
         msg = f"{msg}: {detail}"
-    return ModelProviderError(msg)
+    return ModelProviderStatusError(
+        msg,
+        status_code=response.status_code,
+        detail=detail,
+        retry_after_seconds=response.headers.get("Retry-After-Ms") or response.headers.get("Retry-After"),
+    )
 
 
 def _provider_error_detail(response: httpx.Response) -> str:
