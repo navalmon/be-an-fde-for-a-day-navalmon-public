@@ -134,11 +134,17 @@ Current public endpoint:
 https://fdebench-navalmon-api.lemonpebble-c7043a33.eastus2.azurecontainerapps.io
 ```
 
+The current submission endpoint after the Pulumi redeploy is:
+
+```text
+https://fdebench-dev-api.happymushroom-80f1dc76.westus2.azurecontainerapps.io
+```
+
 Current deployed revision:
 
 ```text
-fdebench-navalmon-api--0000010
-fdebenchnavalmonb0238d7e.azurecr.io/fdebench-api:improve-195a48a
+fdebench-dev-api--0000001
+fdebenchdevb7e9c8b6.azurecr.io/fdebench-api:src-4d36c5b319a7
 ```
 
 ## Tradeoffs

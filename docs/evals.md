@@ -8,11 +8,17 @@ The final submitted service is deployed at:
 https://fdebench-navalmon-api.lemonpebble-c7043a33.eastus2.azurecontainerapps.io
 ```
 
+The current Pulumi-managed submission endpoint is:
+
+```text
+https://fdebench-dev-api.happymushroom-80f1dc76.westus2.azurecontainerapps.io
+```
+
 The latest complete public deployed run after the Task 2 JPEG optimization scored `86.5 / 100` with no errored items. That full run happened after the Task 2-only JPEG tuning run, so the repeated public Task 2 images benefited from the service's in-memory extraction cache. For a colder Task 2 latency read, use the Task 2-only JPEG run below: it improved from `77.8` to `84.6` Tier 1 with P95 latency dropping from `15640 ms` to `9703 ms`.
 
 Using the colder Task 2-only JPEG result with the measured Task 1 and Task 3 scores gives a conservative post-JPEG composite estimate of approximately `85.1`.
 
-The latest hidden submission scored `69.5`. It confirmed the non-PNG Task 2 fix: hidden Task 2 resolution improved from `1.0` to `82.1`. The currently deployed revision `fdebench-navalmon-api--0000010` includes additional Task 1 and Task 2 reliability changes after that hidden run and has not yet been submitted.
+The latest hidden submission scored `69.5`. It confirmed the non-PNG Task 2 fix: hidden Task 2 resolution improved from `1.0` to `82.1`. The currently deployed Pulumi-managed revision `fdebench-dev-api--0000001` includes additional Task 1 and Task 2 reliability changes after that hidden run and has not yet been submitted.
 
 ## Run configurations
 
@@ -23,7 +29,7 @@ The latest hidden submission scored `69.5`. It confirmed the non-PNG Task 2 fix:
 | Task 2 JPEG tuning run | Azure Container Apps HTTPS endpoint | `uv run python run_eval.py --endpoint <endpoint> --task extract` from `py\apps\eval` | 2026-06-25 | Same model with JPEG90, max dimension 2048, detail auto |
 | Final full deployed regression run | Azure Container Apps HTTPS endpoint | `uv run python run_eval.py --endpoint <endpoint>` from `py\apps\eval` | 2026-06-25 | Same model and JPEG90 settings; Task 2 public items were warm-cache repeats |
 | Hidden submission 3 | FDEBench hosted judge | Platform submission | 2026-06-26 | First hidden run after the non-PNG Task 2 image fix |
-| Current deployed improvement revision | Azure Container Apps HTTPS endpoint | Smoke tests plus focused local tests | 2026-06-26 | Public commit `195a48a`; deployed as image `improve-195a48a` |
+| Current deployed improvement revision | Azure Container Apps HTTPS endpoint | Smoke tests plus focused local tests | 2026-06-26 | Public commit `c1b1fa9`; deployed from public source hash as image `src-4d36c5b319a7` |
 
 ## Final full deployed regression run
 
@@ -188,7 +194,7 @@ Azure Log Analytics confirmed the hidden run used the fixed image. Task 2 no lon
 | `invalid_base64` fallbacks | 0 |
 | `invalid_image_bytes` fallbacks | 0 |
 
-The latest revision `0000010` responds to those findings by:
+The latest revision `fdebench-dev-api--0000001` responds to those findings by:
 
 - making extraction start/success telemetry visible in Log Analytics
 - recovering fenced or prose-wrapped JSON objects from model output
@@ -207,7 +213,7 @@ Focused validation for this revision:
 | `uv run pytest -q` from `py/apps/sample` | 122 passed |
 | `uv run pyright apps/sample` from `py` | 0 errors |
 
-Live smoke tests on revision `0000010` passed for `/health`, `/triage`, `/extract` with JPEG input, and `/orchestrate`.
+Live smoke tests on revision `fdebench-dev-api--0000001` passed for `/health`, `/triage`, and `/extract` with JPEG input. Telemetry showed the restored model configuration produced one model start, one model success, zero model failures, and no `invalid_base64_or_png` fallback for the latest smoke request.
 
 ## Error analysis
 
@@ -236,6 +242,6 @@ Task 3 is robust and low latency because it uses deterministic workflow plans an
 ### Cross-task limitations
 
 - The latest measured full deployed composite is from the pre-JPEG Task 2 run; the post-JPEG composite is estimated from separate Task 2 measurement.
-- The latest hidden scored composite is from revision `0000009`; revision `0000010` is deployed but unsubmitted.
+- The latest hidden scored composite is from revision `0000009`; revision `fdebench-dev-api--0000001` is deployed but unsubmitted.
 - The live deployment is tuned for a quota-limited Azure subscription, not maximum throughput.
 - Hidden platform data can differ from public eval examples, especially for Task 2 document layouts and Task 3 workflow families.

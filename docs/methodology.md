@@ -106,6 +106,12 @@ The live submission endpoint is:
 https://fdebench-navalmon-api.lemonpebble-c7043a33.eastus2.azurecontainerapps.io
 ```
 
+The current Pulumi-managed submission endpoint is:
+
+```text
+https://fdebench-dev-api.happymushroom-80f1dc76.westus2.azurecontainerapps.io
+```
+
 ## Evaluation methodology
 
 I used the repository eval harness for all reported numbers:
@@ -139,7 +145,7 @@ This telemetry changed the implementation twice:
 
 ## Current limitations
 
-- Hidden submission 3 scored `69.5` after the non-PNG fix. The latest revision `0000010` includes additional Task 1 and Task 2 improvements that have not yet been scored by the hidden judge.
+- Hidden submission 3 scored `69.5` after the non-PNG fix. The latest Pulumi-managed revision `fdebench-dev-api--0000001` includes additional Task 1 and Task 2 improvements that have not yet been scored by the hidden judge.
 - Task 2 remains the model- and latency-dominant endpoint. Higher quality or higher detail settings may improve extraction resolution but risk worse efficiency.
 - Task 3 is tuned to known workflow families and benchmark constraints. A broader planner could generalize better but would add latency and model dependency.
 - The deployment intentionally caps scale to one replica and model concurrency to two to reduce Azure model throttling during larger hidden Task 2 runs.
